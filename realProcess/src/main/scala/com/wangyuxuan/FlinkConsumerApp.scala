@@ -4,10 +4,14 @@ import java.util.Properties
 
 import com.alibaba.fastjson.{JSON, JSONObject}
 import com.wangyuxuan.bean.{Message, UserScan}
-import com.wangyuxuan.task.{ChannelPVUVTask, ChannelRealHotTask, ChannelRegionTask, ChannelUserFreshnessTask, UserBrowserTask, UserNetWorkTask}
+import com.wangyuxuan.task._
 import com.wangyuxuan.tools.GlobalConfigUtils
 import org.apache.flink.api.common.serialization.SimpleStringSchema
+import org.apache.flink.runtime.state.filesystem.FsStateBackend
+import org.apache.flink.streaming.api.functions.AssignerWithPeriodicWatermarks
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
+import org.apache.flink.streaming.api.watermark.Watermark
+import org.apache.flink.streaming.api.{CheckpointingMode, TimeCharacteristic}
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer
 
 /**
@@ -20,6 +24,18 @@ object FlinkConsumerApp {
     // todo: 1、构建flink实时处理的环境
     val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
     import org.apache.flink.api.scala._
+    // 每隔1000 ms进行启动一个检查点
+    env.enableCheckpointing(1000)
+    // 设置模式为exactly-once 默认(this is the default)
+    env.getCheckpointConfig.setCheckpointingMode(CheckpointingMode.EXACTLY_ONCE)
+    // checkpoint的最小停顿间隔
+    env.getCheckpointConfig.setMinPauseBetweenCheckpoints(500)
+    // 检查点必须在一分钟内完成，或者被丢弃
+    env.getCheckpointConfig.setCheckpointTimeout(60000)
+    // 设置checkpoint目录
+    env.setStateBackend(new FsStateBackend("hdfs://node01:8020/flink-checkpoints"))
+    // 基于eventTime处理数据
+    env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     // todo: 2、获取kafka相关配置
     val properties: Properties = new Properties()
     properties.setProperty("bootstrap.servers", GlobalConfigUtils.getBootstrapServers)
@@ -47,18 +63,41 @@ object FlinkConsumerApp {
       Message(userScan, count, timestamp)
     })
 
+    // -------------------------------添加水印处理start-----------------------
+    val watermarkDataStream: DataStream[Message] = messageDataStream.assignTimestampsAndWatermarks(new AssignerWithPeriodicWatermarks[Message] {
+      var currentTimestamp: Long = 0L
+
+      val maxDelayTime: Long = 5000L
+
+      var watermark: Watermark = null
+
+      // 获取水印
+      override def getCurrentWatermark: Watermark = {
+        watermark = new Watermark(currentTimestamp - maxDelayTime)
+        watermark
+      }
+
+      // 抽取时间戳
+      override def extractTimestamp(t: Message, previousElementTimestamp: Long): Long = {
+        val timestamp: Long = t.timestamp
+        currentTimestamp = Math.max(timestamp, currentTimestamp)
+        currentTimestamp
+      }
+    })
+    // -------------------------------添加水印处理end-----------------------------
+
     // todo:1、实时频道热点统计
-//    ChannelRealHotTask.process(messageDataStream)
+    ChannelRealHotTask.process(watermarkDataStream)
     // todo: 2、实时频道的PV/UV统计
-//    ChannelPVUVTask.process(messageDataStream)
+    ChannelPVUVTask.process(watermarkDataStream)
     // todo: 3、实时频道的新鲜度统计
-//    ChannelUserFreshnessTask.process(messageDataStream)
+    ChannelUserFreshnessTask.process(watermarkDataStream)
     // todo: 4、实时频道的地域统计
-//    ChannelRegionTask.process(messageDataStream)
+    ChannelRegionTask.process(watermarkDataStream)
     // todo: 5、实时用户上网类型统计
-//    UserNetWorkTask.process(messageDataStream)
+    UserNetWorkTask.process(watermarkDataStream)
     // todo: 6、实时用户上网类型统计
-    UserBrowserTask.process(messageDataStream)
+    UserBrowserTask.process(watermarkDataStream)
 
     // 启动flink程序
     env.execute("app")
