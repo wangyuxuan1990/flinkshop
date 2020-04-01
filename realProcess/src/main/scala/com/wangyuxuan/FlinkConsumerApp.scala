@@ -4,7 +4,7 @@ import java.util.Properties
 
 import com.alibaba.fastjson.{JSON, JSONObject}
 import com.wangyuxuan.bean.{Message, UserScan}
-import com.wangyuxuan.task.{ChannelPVUVTask, ChannelRealHotTask, ChannelRegionTask, ChannelUserFreshnessTask, UserNetWorkTask}
+import com.wangyuxuan.task.{ChannelPVUVTask, ChannelRealHotTask, ChannelRegionTask, ChannelUserFreshnessTask, UserBrowserTask, UserNetWorkTask}
 import com.wangyuxuan.tools.GlobalConfigUtils
 import org.apache.flink.api.common.serialization.SimpleStringSchema
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
@@ -56,7 +56,9 @@ object FlinkConsumerApp {
     // todo: 4、实时频道的地域统计
 //    ChannelRegionTask.process(messageDataStream)
     // todo: 5、实时用户上网类型统计
-    UserNetWorkTask.process(messageDataStream)
+//    UserNetWorkTask.process(messageDataStream)
+    // todo: 6、实时用户上网类型统计
+    UserBrowserTask.process(messageDataStream)
 
     // 启动flink程序
     env.execute("app")
