@@ -4,6 +4,7 @@ import java.util.Properties
 
 import com.alibaba.fastjson.{JSON, JSONObject}
 import com.wangyuxuan.bean.{Message, UserScan}
+import com.wangyuxuan.task.ChannelRealHotTask
 import com.wangyuxuan.tools.GlobalConfigUtils
 import org.apache.flink.api.common.serialization.SimpleStringSchema
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
@@ -32,7 +33,7 @@ object FlinkConsumerApp {
     // 添加source数据源
     val source: DataStream[String] = env.addSource(kafkaConsumer)
     // 解析topic中的数据
-    source.map(line => {
+    val messageDataStream: DataStream[Message] = source.map(line => {
       val value: JSONObject = JSON.parseObject(line)
       // 获取message
       val content: String = value.getString("content")
@@ -44,7 +45,10 @@ object FlinkConsumerApp {
       val userScan: UserScan = UserScan.toBean(content)
       // 封装用户访问信息到Message对象中
       Message(userScan, count, timestamp)
-    }).print()
+    })
+
+    // todo:1、实时频道热点统计
+    ChannelRealHotTask.process(messageDataStream)
 
     // 启动flink程序
     env.execute("app")
