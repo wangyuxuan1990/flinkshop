@@ -35,7 +35,7 @@ object PreProcessTask {
 
   def formatDateTime(date: String, format: String) = {
     val timestampFormat: FastDateFormat = FastDateFormat.getInstance("yyyy-MM-dd HH:mm:ss")
-    val timestamp: Long = timestampFormat.parse(date).getTime
+    val timestamp: Long = timestampFormat.parse(date.trim).getTime
     val formatDate: FastDateFormat = FastDateFormat.getInstance(format)
     formatDate.format(timestamp)
   }

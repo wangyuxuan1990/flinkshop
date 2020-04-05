@@ -115,8 +115,8 @@ object HbaseUtils {
           put.addColumn(Bytes.toBytes(columnFamily), Bytes.toBytes(k.toString), Bytes.toBytes(v.toString))
           puts.add(put)
         }
+        table.put(puts)
       }
-      table.put(puts)
     } catch {
       case e: Exception => e.printStackTrace()
     } finally {

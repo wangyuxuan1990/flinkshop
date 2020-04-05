@@ -104,7 +104,7 @@ object HbaseUtils {
    * @param columnFamily
    * @param map
    */
-  def putMapData(tableName: TableName, rowKey: String, columnFamily: String, map: Map[String, Long]): Unit = {
+  def putMapData(tableName: TableName, rowKey: String, columnFamily: String, map: Map[String, Object]): Unit = {
     val table: Table = createTable(tableName, columnFamily)
     try {
       val put: Put = new Put(rowKey.getBytes())
@@ -115,8 +115,8 @@ object HbaseUtils {
           put.addColumn(Bytes.toBytes(columnFamily), Bytes.toBytes(k.toString), Bytes.toBytes(v.toString))
           puts.add(put)
         }
+        table.put(puts)
       }
-      table.put(puts)
     } catch {
       case e: Exception => e.printStackTrace()
     } finally {
